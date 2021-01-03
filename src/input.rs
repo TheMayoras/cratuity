@@ -1,21 +1,6 @@
-use std::{
-    error::Error,
-    io,
-    io::{Stdout, Write},
-    sync::mpsc::{self, Sender},
-    thread,
-    time::Duration,
-};
+use std::{sync::mpsc::Sender, time::Duration};
 
-
-use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event as TermEvent, KeyCode, KeyEvent},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-
-
-
+use crossterm::event::{self, Event as TermEvent, KeyCode};
 
 pub enum InputEvent {
     Quit,

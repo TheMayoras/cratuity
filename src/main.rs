@@ -1,16 +1,15 @@
 use std::{
     error::Error,
     io,
-    io::{Stdout, Write},
-    sync::mpsc::{self, Sender},
+    io::Write,
+    sync::mpsc::{self},
     thread,
     time::Duration,
 };
 
-
-use crates_io::CrateSearchResponse;
+use crates_io::{CrateSearchResponse, CrateSearcher};
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event as TermEvent, KeyCode, KeyEvent},
+    event::{DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -30,21 +29,13 @@ mod input;
 mod widgets;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let crates_client = blocking::Client::builder()
-        .user_agent("craters-tui-searcher")
-        .build()
-        .unwrap();
+    let crates_client = CrateSearcher::new().unwrap();
+    //    let req = crates_client
+    //        .get("https://crates.io/api/v1/crates?page=1&per_page=10&q=serde")
+    //        .build()
+    //        .unwrap();
 
-    let req = crates_client
-        .get("https://crates.io/api/v1/crates?page=1&per_page=10&q=serde")
-        .build()
-        .unwrap();
-
-    let resp = crates_client
-        .execute(req)
-        .unwrap()
-        .json::<CrateSearchResponse>()
-        .unwrap();
+    let resp = crates_client.search("serde", 1).unwrap();
     println!("Response: {:#?}", resp);
 
     let mut stdout = io::stdout();
@@ -92,7 +83,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         match rx.recv_timeout(Duration::from_secs(100)) {
             Ok(InputEvent::Quit) | Err(_) => break,
-            _ => {}
         }
     }
     disable_raw_mode()?;
