@@ -1,0 +1,17 @@
+[package]
+name = "craters"
+version = "0.1.0"
+authors = ["Ben Mayoras <ben.mayoras@gmail.com>"]
+edition = "2018"
+description = "A tui for searching crates.io"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+reqwest = { version = "0.10.10", features = ["blocking", "json"] }
+
+crossterm = "0.18"
+tui = { version = "0.14", default-features = false, features = ['crossterm'] }
+
+serde = { version = "1.0.118", features = ["derive"] }
+chrono = { version = "0.4.19", features = ["serde"] }
