@@ -5,16 +5,6 @@ use serde::{Deserialize, Serialize};
 const CRATES_URL: &str = "https://crates.io/api/v1/crates";
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct CrateSearchLinks {
-    pub version_downloads: String,
-    pub versions: String,
-    pub owners: String,
-    pub owner_team: String,
-    pub owner_user: String,
-    pub reverse_dependencies: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 pub struct CrateSearchResponse {
     pub crates: Vec<CrateSearch>,
 }
@@ -34,6 +24,16 @@ pub struct CrateSearch {
     pub repository: Option<String>,
     pub links: CrateSearchLinks,
     pub exact_match: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CrateSearchLinks {
+    pub version_downloads: String,
+    pub versions: String,
+    pub owners: String,
+    pub owner_team: String,
+    pub owner_user: String,
+    pub reverse_dependencies: String,
 }
 
 /// A struct that will be used to search crates.io

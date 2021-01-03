@@ -1,9 +1,9 @@
 use tui::{
     buffer::Buffer,
     layout::{
-        Alignment::{Center, Left, Right},
+        Alignment::{self, Center, Left, Right},
         Constraint,
-        Direction::Horizontal,
+        Direction::{self, Horizontal},
         Layout, Rect,
     },
     style::{Color, Style},
@@ -63,6 +63,34 @@ impl<'a> CrateWidget<'a> {
             .alignment(Right);
         paragraph.render(parts[3], buf);
     }
+
+    fn render_versions(&self, area: Rect, buf: &mut Buffer) {
+        let style = Style::default().fg(Color::Blue);
+
+        let sections = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(
+                [
+                    Constraint::Percentage(25),
+                    Constraint::Percentage(25),
+                    Constraint::Percentage(25),
+                    Constraint::Percentage(25),
+                ]
+                .as_ref(),
+            )
+            .split(area);
+
+        let max_ver = format!("Max Version: {}", self.crte.max_version);
+        Paragraph::new(max_ver.as_str())
+            .style(style)
+            .render(sections[0], buf);
+
+        let recent_ver = format!("Newest Version: {}", self.crte.newest_version);
+        Paragraph::new(recent_ver.as_str())
+            .style(style)
+            .alignment(Alignment::Center)
+            .render(sections[1], buf);
+    }
 }
 
 impl<'a> From<&'a CrateSearch> for CrateWidget<'a> {
@@ -82,16 +110,24 @@ impl Widget for CrateWidget<'_> {
         block.render(area, buf);
 
         let sections = Layout::default()
-            .constraints([Constraint::Length(1), Constraint::Percentage(100)].as_ref())
+            .constraints(
+                [
+                    Constraint::Length(1),
+                    Constraint::Length(1),
+                    Constraint::Percentage(100),
+                ]
+                .as_ref(),
+            )
             .split(inner);
 
         // Created at date
         self.render_top(sections[0], buf);
+        self.render_versions(sections[1], buf);
 
         // Crate description
         if let Some(ref desc) = self.crte.description {
             let paragraph = Paragraph::new(desc.as_str()).wrap(Wrap { trim: true });
-            paragraph.render(sections[1], buf);
+            paragraph.render(sections[2], buf);
         }
     }
 }
