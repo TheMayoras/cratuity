@@ -4,26 +4,24 @@ use std::{
     io::Write,
     sync::mpsc::{self},
     thread,
-    time::Duration,
 };
 
-use crates_io::{CrateSearchResponse, CrateSearcher};
+use app::App;
+use crates_io::CrateSearcher;
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use input::{InputEvent, InputMonitor};
-use reqwest::blocking;
+use input::{InputMonitor};
 
 use tui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Layout},
-    widgets::{Block, BorderType::Thick, Borders},
     Terminal,
 };
-use widgets::CrateWidget;
 
+
+mod app;
 mod crates_io;
 mod input;
 mod widgets;
@@ -38,6 +36,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let resp = crates_client.search("serde", 1).unwrap();
     println!("Response: {:#?}", resp);
 
+    let (tx, rx) = mpsc::channel();
+    thread::spawn(move || InputMonitor::new(tx).monitor());
+    let mut app = App::new(rx);
+    app.crates = Some(resp);
+
     let mut stdout = io::stdout();
     enable_raw_mode()?;
 
@@ -46,43 +49,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
 
-    let (tx, rx) = mpsc::channel();
-    thread::spawn(move || InputMonitor::new(tx).monitor());
-
     loop {
         terminal.draw(|f| {
-            let size = f.size();
-            let block = Block::default()
-                .title("Craters (A crates.io quick search TUI)")
-                .borders(Borders::ALL)
-                .border_type(Thick);
-            let widgets = resp.crates.iter().map(CrateWidget::from);
-
-            let splits = Layout::default()
-                .horizontal_margin(1)
-                .constraints(
-                    [
-                        Constraint::Percentage(10),
-                        Constraint::Percentage(10),
-                        Constraint::Percentage(10),
-                        Constraint::Percentage(10),
-                        Constraint::Percentage(10),
-                        Constraint::Percentage(10),
-                        Constraint::Percentage(10),
-                        Constraint::Percentage(10),
-                        Constraint::Percentage(10),
-                        Constraint::Percentage(10),
-                    ]
-                    .as_ref(),
-                )
-                .split(block.inner(f.size()));
-            widgets.zip(splits).for_each(|(w, a)| f.render_widget(w, a));
-
-            f.render_widget(block, size);
+            app.draw(f);
         })?;
 
-        match rx.recv_timeout(Duration::from_secs(100)) {
-            Ok(InputEvent::Quit) | Err(_) => break,
+        app.await_input();
+        if app.quit {
+            break;
         }
     }
     disable_raw_mode()?;
