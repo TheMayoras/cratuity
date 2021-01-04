@@ -39,7 +39,7 @@ impl App {
     pub fn draw<T: Backend>(&self, f: &mut Frame<T>) {
         let size = f.size();
         let block = Block::default()
-            .title("Craters (A crates.io quick search TUI)")
+            .title("Cratuity (A crates.io quick search TUI)")
             .borders(Borders::ALL)
             .border_type(BorderType::Thick);
 
