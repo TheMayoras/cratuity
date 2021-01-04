@@ -45,11 +45,13 @@ impl App {
 
         let area = block.inner(f.size());
 
+        // render the top message
         let splits = Layout::default()
             .constraints([Constraint::Length(2), Constraint::Min(5)].as_ref())
             .split(area);
 
         let top = splits[0];
+        let area = splits[1];
         let message = if self.is_inpt {
             "Type to enter your search term.  Press Enter to confirm.  Press ESC to cancel"
         } else {
@@ -58,7 +60,16 @@ impl App {
         let message = Paragraph::new(message);
         f.render_widget(message, top);
 
-        let area = splits[1];
+        // render the bottom message with page details
+        let splits = Layout::default()
+            .constraints([Constraint::Min(5), Constraint::Length(1)].as_ref())
+            .split(area);
+
+        let bot = splits[1];
+        let area = splits[0];
+
+        let message = Paragraph::new(format!("Page {}", self.page));
+        f.render_widget(message, bot);
 
         if let Some(CrateSearchResponse { ref crates }) = self.crates {
             let widgets = crates.iter().map(CrateWidget::from);
@@ -118,31 +129,28 @@ impl App {
             Ok(InputEvent::Char(c)) if !self.is_inpt => match c {
                 'j' | 'J' => {
                     if self.crates.as_ref().map(|c| c.crates.len()).unwrap_or(0) > 0 {
-                        let search = self.inpt.as_ref();
                         self.page += 1;
-                        let resp = self.client.search(search.unwrap(), self.page);
-                        match resp {
-                            Ok(crates) => self.crates = Some(crates),
-                            Err(_) => self.crates = None,
-                        }
+                        self.do_search()
                     }
                 }
                 'k' | 'K' => {
-                    if self.crates.as_ref().map(|c| c.crates.len()).unwrap_or(0) > 0
-                        && self.page > 1
-                    {
-                        let search = self.inpt.as_ref();
+                    if self.page > 1 {
                         self.page -= 1;
-                        let resp = self.client.search(search.unwrap(), self.page);
-                        match resp {
-                            Ok(crates) => self.crates = Some(crates),
-                            Err(_) => self.crates = None,
-                        }
+                        self.do_search()
                     }
                 }
                 _ => {}
             },
             _ => {}
+        }
+    }
+
+    fn do_search(&mut self) {
+        let search = self.inpt.as_ref();
+        let resp = self.client.search(search.unwrap(), self.page);
+        match resp {
+            Ok(crates) => self.crates = Some(crates),
+            Err(_) => self.crates = None,
         }
     }
 }
