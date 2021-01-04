@@ -60,7 +60,7 @@ impl CrateSearcher {
         let url = url
             .query_pairs_mut()
             .append_pair("page", page.to_string().as_str())
-            .append_pair("per_page", "10")
+            .append_pair("per_page", "5")
             .append_pair("q", term.as_ref())
             .finish();
 

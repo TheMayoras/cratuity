@@ -13,13 +13,9 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use input::{InputMonitor};
+use input::InputMonitor;
 
-use tui::{
-    backend::CrosstermBackend,
-    Terminal,
-};
-
+use tui::{backend::CrosstermBackend, Terminal};
 
 mod app;
 mod crates_io;
@@ -27,19 +23,9 @@ mod input;
 mod widgets;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let crates_client = CrateSearcher::new().unwrap();
-    //    let req = crates_client
-    //        .get("https://crates.io/api/v1/crates?page=1&per_page=10&q=serde")
-    //        .build()
-    //        .unwrap();
-
-    let resp = crates_client.search("serde", 1).unwrap();
-    println!("Response: {:#?}", resp);
-
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || InputMonitor::new(tx).monitor());
     let mut app = App::new(rx);
-    app.crates = Some(resp);
 
     let mut stdout = io::stdout();
     enable_raw_mode()?;

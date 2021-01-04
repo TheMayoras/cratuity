@@ -7,7 +7,7 @@ use tui::{
         Layout, Rect,
     },
     style::{Color, Style},
-    widgets::{Block, BorderType, Borders, Paragraph, Widget, Wrap},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph, Widget, Wrap},
 };
 
 use crate::crates_io::CrateSearch;
@@ -129,5 +129,78 @@ impl Widget for CrateWidget<'_> {
             let paragraph = Paragraph::new(desc.as_str()).wrap(Wrap { trim: true });
             paragraph.render(sections[2], buf);
         }
+    }
+}
+
+pub struct InputWidget<'a, T> {
+    title: T,
+    inpt: &'a str,
+}
+
+impl<'a, T: AsRef<str>> InputWidget<'a, T> {
+    pub fn new(title: T, inpt: &'a str) -> Self {
+        Self { title, inpt }
+    }
+}
+impl<'a, T: AsRef<str>> InputWidget<'a, T> {
+    fn get_area(&self, area: Rect) -> Rect {
+        let len = self.inpt.len() + 5; // the length needed + some padding + 1 for the '|' character
+        let len = len.max(25).max(self.title.as_ref().len()) as u16;
+
+        let horz_pad = (area.width - len).wrapping_div(2);
+
+        let center = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(
+                [
+                    Constraint::Length(horz_pad),
+                    Constraint::Min(len),
+                    Constraint::Length(horz_pad),
+                ]
+                .as_ref(),
+            )
+            .split(area)[1];
+
+        let height = 5;
+        let vert_pad = (area.height - height) / 2;
+
+        let center = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                [
+                    Constraint::Length(vert_pad),
+                    Constraint::Min(height),
+                    Constraint::Length(vert_pad),
+                ]
+                .as_ref(),
+            )
+            .split(center)[1];
+
+        center
+    }
+}
+
+impl<'a, T: AsRef<str>> Widget for InputWidget<'a, T> {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let inpt = format!("{}|", self.inpt);
+        let inpt = Paragraph::new(inpt);
+
+        let area = self.get_area(area);
+
+        // clear the screen below
+        Clear::render(Clear, area, buf);
+
+        // leave a bit of room on the outside
+        let area = Block::default().borders(Borders::ALL).inner(area);
+
+        // draw a border around with the given title
+        let border = Block::default()
+            .title(self.title.as_ref())
+            .borders(Borders::ALL);
+
+        let inner = border.inner(area);
+        border.render(area, buf);
+
+        inpt.render(inner, buf);
     }
 }
