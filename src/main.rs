@@ -7,7 +7,7 @@ use std::{
 };
 
 use app::App;
-use crates_io::CrateSearcher;
+
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,

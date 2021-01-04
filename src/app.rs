@@ -3,7 +3,7 @@ use std::{sync::mpsc::Receiver, time::Duration};
 use tui::{
     backend::Backend,
     layout::{Constraint, Layout},
-    widgets::{Block, BorderType, Borders},
+    widgets::{Block, BorderType, Borders, Paragraph},
     Frame,
 };
 
@@ -43,6 +43,23 @@ impl App {
             .borders(Borders::ALL)
             .border_type(BorderType::Thick);
 
+        let area = block.inner(f.size());
+
+        let splits = Layout::default()
+            .constraints([Constraint::Length(2), Constraint::Min(5)].as_ref())
+            .split(area);
+
+        let top = splits[0];
+        let message = if self.is_inpt {
+            "Type to enter your search term.  Press Enter to confirm.  Press ESC to cancel"
+        } else {
+            "Press J/K to move between pages.  Press f to search for a term"
+        };
+        let message = Paragraph::new(message);
+        f.render_widget(message, top);
+
+        let area = splits[1];
+
         if let Some(CrateSearchResponse { ref crates }) = self.crates {
             let widgets = crates.iter().map(CrateWidget::from);
 
@@ -50,15 +67,15 @@ impl App {
                 .horizontal_margin(1)
                 .constraints(
                     [
-                        Constraint::Percentage(15),
-                        Constraint::Percentage(15),
-                        Constraint::Percentage(15),
-                        Constraint::Percentage(15),
-                        Constraint::Percentage(15),
+                        Constraint::Percentage(20),
+                        Constraint::Percentage(20),
+                        Constraint::Percentage(20),
+                        Constraint::Percentage(20),
+                        Constraint::Percentage(20),
                     ]
                     .as_ref(),
                 )
-                .split(block.inner(f.size()));
+                .split(area);
             widgets.zip(splits).for_each(|(w, a)| f.render_widget(w, a));
         }
 
