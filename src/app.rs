@@ -2,7 +2,8 @@ use std::{sync::mpsc::Receiver, time::Duration};
 
 use tui::{
     backend::Backend,
-    layout::{Constraint, Layout},
+    buffer::Buffer,
+    layout::{Constraint, Layout, Rect},
     widgets::{Block, BorderType, Borders, Paragraph},
     Frame,
 };
