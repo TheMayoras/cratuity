@@ -1,3 +1,5 @@
+use std::cmp;
+
 use tui::{
     buffer::Buffer,
     layout::{
@@ -7,10 +9,13 @@ use tui::{
         Layout, Rect,
     },
     style::{Color, Style},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph, Widget, Wrap},
+    widgets::{
+        Block, BorderType, Borders, Clear, List, ListItem, ListState, Paragraph, StatefulWidget,
+        Widget, Wrap,
+    },
 };
 
-use crate::crates_io::CrateSearch;
+use crate::{app::SortingField, crates_io::CrateSearch};
 
 const STR_FORMAT: &str = "%x %H:%M";
 
@@ -202,5 +207,79 @@ impl<'a, T: AsRef<str>> Widget for InputWidget<'a, T> {
         border.render(area, buf);
 
         inpt.render(inner, buf);
+    }
+}
+
+pub struct SortingWidget<'a> {
+    state: &'a SortingField,
+    title: &'a str,
+}
+impl<'a> SortingWidget<'a> {
+    pub fn new(state: &'a SortingField, title: &'a str) -> Self {
+        Self { state, title }
+    }
+
+    fn get_area(&self, area: Rect) -> Rect {
+        let SortingField {
+            selection: _selection,
+            strs,
+            items: _items,
+        } = self.state;
+
+        let height = strs.len() as u16 + 2;
+        let len = strs.iter().map(String::len).max().unwrap();
+        let len = cmp::max(len, self.title.len()) as u16 + 4;
+
+        let horz_pad = (area.width - len as u16).wrapping_div(2);
+
+        let center = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(
+                [
+                    Constraint::Length(horz_pad),
+                    Constraint::Min(len),
+                    Constraint::Length(horz_pad),
+                ]
+                .as_ref(),
+            )
+            .split(area)[1];
+
+        let vert_pad = (area.height - height) / 2;
+
+        let center = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                [
+                    Constraint::Length(vert_pad),
+                    Constraint::Min(height),
+                    Constraint::Length(vert_pad),
+                ]
+                .as_ref(),
+            )
+            .split(center)[1];
+
+        center
+    }
+}
+
+impl<'a> Widget for SortingWidget<'a> {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let SortingField {
+            selection,
+            strs,
+            items: _items,
+        } = self.state;
+        let mut state = ListState::default();
+        state.select(Some(*selection));
+        let items = strs.iter().map(String::as_str).map(ListItem::new);
+        let list = List::new(items.collect::<Vec<_>>()).highlight_symbol("* ");
+
+        let area = self.get_area(area);
+        Clear.render(area, buf);
+        let border = Block::default().borders(Borders::ALL).title(self.title);
+        let inner = border.inner(area);
+        border.render(area, buf);
+
+        StatefulWidget::render(list, inner, buf, &mut state);
     }
 }
