@@ -13,6 +13,11 @@ use crate::{
     widgets::{CrateWidget, InputWidget},
 };
 
+pub enum AppMode {
+    Normal,
+    Input(String),
+}
+
 pub struct App {
     input_rx: Receiver<InputEvent>,
     client: CrateSearcher,
@@ -21,6 +26,7 @@ pub struct App {
     inpt: Option<String>,
     is_inpt: bool,
     page: u32,
+    mode: AppMode,
 }
 
 impl App {
@@ -33,6 +39,7 @@ impl App {
             inpt: Some("".to_string()),
             is_inpt: true,
             page: 1,
+            mode: AppMode::Input("".to_string()),
         }
     }
 
@@ -91,57 +98,61 @@ impl App {
         }
 
         f.render_widget(block, size);
+        self.draw_mode(f);
+    }
 
-        // render an input widget
-        if self.is_inpt {
-            if let Some(inpt) = &self.inpt {
-                let inpt = InputWidget::new("Enter you search term", inpt.as_str());
+    fn draw_mode<T: Backend>(&self, f: &mut Frame<T>) {
+        match &self.mode {
+            AppMode::Input(msg) => {
+                let inpt = InputWidget::new("Enter you search term", msg.as_str());
                 f.render_widget(inpt, f.size());
             }
+            AppMode::Normal => {}
         }
     }
 
     pub fn await_input(&mut self) {
-        match self.input_rx.recv_timeout(Duration::from_secs(1)) {
-            Ok(InputEvent::Char('q')) | Ok(InputEvent::Char('Q')) if !self.is_inpt => {
-                self.quit = true
-            }
-            Ok(InputEvent::Char('f')) | Ok(InputEvent::Char('F')) if !self.is_inpt => {
-                self.inpt = Some("".to_string());
-                self.is_inpt = true;
-            }
-            Ok(InputEvent::Esc) if self.is_inpt => self.is_inpt = false,
-            Ok(InputEvent::Backspace) if self.is_inpt => {
-                let _ = self.inpt.as_mut().map(|i| i.pop());
-            }
-            Ok(InputEvent::Enter) if self.is_inpt => {
-                self.is_inpt = false;
-                let search = self.inpt.as_ref();
-                let resp = self.client.search(search.unwrap(), self.page);
-                match resp {
-                    Ok(crates) => self.crates = Some(crates),
-                    Err(_) => self.crates = None,
-                }
-            }
-            Ok(InputEvent::Char(c)) if self.is_inpt => {
-                self.inpt.as_mut().map(|i| i.push(c));
-            }
-            Ok(InputEvent::Char(c)) if !self.is_inpt => match c {
-                'j' | 'J' => {
-                    if self.crates.as_ref().map(|c| c.crates.len()).unwrap_or(0) > 0 {
-                        self.page += 1;
-                        self.do_search()
+        if let Ok(inpt) = self.input_rx.recv_timeout(Duration::from_secs(1)) {
+            match &mut self.mode {
+                AppMode::Normal => match inpt {
+                    InputEvent::Char('q') | InputEvent::Char('Q') => {
+                        self.quit = true;
                     }
-                }
-                'k' | 'K' => {
-                    if self.page > 1 {
-                        self.page -= 1;
-                        self.do_search()
+                    InputEvent::Char('f') | InputEvent::Char('F') => {
+                        self.mode = AppMode::Input("".to_string());
                     }
-                }
-                _ => {}
-            },
-            _ => {}
+                    InputEvent::Char(c) => match c {
+                        'j' | 'J' => {
+                            if self.crates.as_ref().map(|c| c.crates.len()).unwrap_or(0) > 0 {
+                                self.page += 1;
+                                self.do_search();
+                            }
+                        }
+                        'k' | 'K' => {
+                            if self.page > 1 {
+                                self.page -= 1;
+                                self.do_search();
+                            }
+                        }
+                        _ => {}
+                    },
+                    _ => {}
+                },
+                AppMode::Input(ref mut msg) => match inpt {
+                    InputEvent::Esc => self.mode = AppMode::Normal,
+                    InputEvent::Enter => {
+                        let replaced = std::mem::take(msg);
+                        self.page = 1;
+                        self.inpt = Some(replaced);
+                        self.do_search();
+                        self.mode = AppMode::Normal;
+                    }
+                    InputEvent::Backspace => {
+                        let _ = msg.pop();
+                    }
+                    InputEvent::Char(c) => msg.push(c),
+                },
+            }
         }
     }
 
