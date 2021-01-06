@@ -29,3 +29,5 @@ search for crates on Crates.io.  These are
 3. Recently Downloaded
 4. Recently Updated
 5. Newly Added
+
+_Please submit any issues for feature requests to the github repository!_
