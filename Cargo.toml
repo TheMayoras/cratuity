@@ -1,9 +1,10 @@
 [package]
 name = "cratuity"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Ben Mayoras <ben.mayoras@gmail.com>"]
 edition = "2018"
 description = "A tui for searching crates.io"
+repository = "https://github.com/TheMayoras/cratuity"
 license = "GPL-3.0-or-later"
 keywords = ["tui", "crates-io", "search", "terminal"]
 
