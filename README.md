@@ -6,7 +6,7 @@ The searches done are return the same results as if you entered the search term
 into the search bar on crates.io.  The results are returned in pages of 5
 results each
 
-![Cratuity demo](assets/demo.gif)
+![Cratuity demo](https://raw.githubusercontent.com/TheMayoras/cratuity/master/assets/demo.gif)
 
 ## Usage
 
