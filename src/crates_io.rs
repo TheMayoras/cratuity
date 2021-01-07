@@ -59,6 +59,12 @@ pub struct CrateSearch {
     pub exact_match: bool,
 }
 
+impl CrateSearch {
+    pub fn get_toml_str(&self) -> String {
+        format!("{} = \"{}\"", self.id, self.newest_version)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CrateSearchLinks {
     pub version_downloads: String,

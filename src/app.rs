@@ -3,12 +3,15 @@ use std::{cmp, sync::mpsc::Receiver, time::Duration};
 use tui::{
     backend::Backend,
     layout::{Constraint, Layout},
+    text::Text,
     widgets::{Block, BorderType, Borders, Paragraph},
     Frame,
 };
 
+use clipboard::{ClipboardContext, ClipboardProvider};
+
 use crate::{
-    crates_io::{CrateSearchResponse, CrateSearcher, CratesSort},
+    crates_io::{CrateSearch, CrateSearchResponse, CrateSearcher, CratesSort},
     input::InputEvent,
     widgets::{CrateWidget, InputWidget, SortingWidget},
 };
@@ -54,6 +57,7 @@ pub struct App {
     page: u32,
     sort: CratesSort,
     mode: AppMode,
+    selection: Option<usize>,
 }
 
 impl App {
@@ -67,6 +71,7 @@ impl App {
             page: 1,
             mode: AppMode::Input("".to_string()),
             sort: CratesSort::Relevance,
+            selection: None,
         }
     }
 
@@ -87,12 +92,14 @@ impl App {
         let top = splits[0];
         let area = splits[1];
         let message = match self.mode {
-            AppMode::Normal => "Press J/K to move between pages.  Press f to search for a term",
+            AppMode::Normal => {
+                Text::raw("Press N/P to move between pages.  Press f to search for a term\nPress J/K to change the highlighted Crate and press C to copy it's Cargo.toml string") 
+            }
             AppMode::Input(_) => {
-                "Type to enter your search term.  Press Enter to confirm.  Press ESC to cancel"
+                "Type to enter your search term.  Press Enter to confirm.  Press ESC to cancel".into()
             }
             AppMode::Sorting(_) => {
-                "Press J/K to move between options.  Press Enter to confirm.  Press ESC to cancel"
+                "Press J/K to move between options.  Press Enter to confirm.  Press ESC to cancel".into()
             }
         };
         let message = Paragraph::new(message);
@@ -110,7 +117,14 @@ impl App {
         f.render_widget(message, bot);
 
         if let Some(CrateSearchResponse { ref crates }) = self.crates {
-            let widgets = crates.iter().map(CrateWidget::from);
+            let mut widgets = Vec::new();
+            for (i, crte) in crates.iter().enumerate() {
+                if let Some(selection) = self.selection {
+                    widgets.push(CrateWidget::new(crte, selection == i));
+                } else {
+                    widgets.push(CrateWidget::new(crte, false));
+                }
+            }
 
             let splits = Layout::default()
                 .horizontal_margin(1)
@@ -125,7 +139,10 @@ impl App {
                     .as_ref(),
                 )
                 .split(area);
-            widgets.zip(splits).for_each(|(w, a)| f.render_widget(w, a));
+            widgets
+                .into_iter()
+                .zip(splits)
+                .for_each(|(w, a)| f.render_widget(w, a));
         }
 
         f.render_widget(block, size);
@@ -157,20 +174,51 @@ impl App {
                         'q' | 'Q' => {
                             self.quit = true;
                         }
-                        'j' | 'J' => {
+                        'n' | 'N' => {
                             if self.crates.as_ref().map(|c| c.crates.len()).unwrap_or(0) > 0 {
                                 self.page += 1;
                                 self.do_search();
                             }
                         }
-                        'k' | 'K' => {
+                        'p' | 'P' => {
                             if self.page > 1 {
                                 self.page -= 1;
                                 self.do_search();
                             }
                         }
+                        'j' | 'J' => {
+                            if let Some(selection) = self.selection {
+                                self.selection = Some(cmp::min(
+                                    selection + 1,
+                                    self.crates
+                                        .as_ref()
+                                        .map(|resp| &resp.crates)
+                                        .map(|crates| crates.len() - 1)
+                                        .unwrap_or(0),
+                                ));
+                            }
+                        }
+                        'k' | 'K' => {
+                            if let Some(selection) = self.selection {
+                                if selection > 0 {
+                                    self.selection = Some(selection - 1);
+                                }
+                            }
+                        }
                         's' | 'S' => {
                             self.mode = AppMode::Sorting(SortingField::from(&self.sort));
+                        }
+                        'c' | 'C' => {
+                            if let Some(selection) = self.selection {
+                                if let Some(ref crates) = self.crates {
+                                    let crte = crates.crates.get(selection);
+                                    let toml = crte.map(CrateSearch::get_toml_str);
+                                    let mut clipboard: ClipboardContext =
+                                        ClipboardProvider::new().unwrap();
+
+                                    toml.map(|toml| clipboard.set_contents(toml).unwrap());
+                                }
+                            }
                         }
                         _ => {}
                     },
@@ -203,10 +251,10 @@ impl App {
                         self.do_search();
                     }
                     InputEvent::Char(c) => match c {
-                        'k' | 'K' => {
+                        'p' | 'P' => {
                             *selection = selection.saturating_sub(1);
                         }
-                        'j' | 'J' => {
+                        'n' | 'N' => {
                             *selection = cmp::min(*selection + 1, 4);
                         }
                         _ => {}
@@ -225,6 +273,16 @@ impl App {
         match resp {
             Ok(crates) => self.crates = Some(crates),
             Err(_) => self.crates = None,
+        }
+
+        self.selection = if let Some(ref crates) = self.crates {
+            if crates.crates.len() > 0 {
+                Some(0)
+            } else {
+                None
+            }
+        } else {
+            None
         }
     }
 }

@@ -21,9 +21,14 @@ const STR_FORMAT: &str = "%x %H:%M";
 
 pub struct CrateWidget<'a> {
     crte: &'a CrateSearch,
+    selected: bool,
 }
 
 impl<'a> CrateWidget<'a> {
+    pub fn new(crte: &'a CrateSearch, selected: bool) -> Self {
+        Self { crte, selected }
+    }
+
     fn render_top(&self, area: Rect, buf: &mut Buffer) {
         let style = Style::default().fg(Color::Red);
         let parts = Layout::default()
@@ -98,18 +103,18 @@ impl<'a> CrateWidget<'a> {
     }
 }
 
-impl<'a> From<&'a CrateSearch> for CrateWidget<'a> {
-    fn from(crte: &'a CrateSearch) -> Self {
-        CrateWidget { crte }
-    }
-}
-
 impl Widget for CrateWidget<'_> {
     fn render(self, area: tui::layout::Rect, buf: &mut tui::buffer::Buffer) {
         let block = Block::default()
             .borders(Borders::ALL)
             .title(self.crte.name.as_str())
             .border_type(BorderType::Plain);
+
+        let block = if self.selected {
+            block.border_style(Style::default().fg(Color::Red))
+        } else {
+            block
+        };
 
         let inner = block.inner(area); // the inner area that the border does not take up
         block.render(area, buf);
