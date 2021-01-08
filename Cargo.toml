@@ -7,6 +7,8 @@ description = "A tui for searching crates.io"
 repository = "https://github.com/TheMayoras/cratuity"
 license = "GPL-3.0-or-later"
 keywords = ["tui", "crates-io", "search", "terminal"]
+exclude = ["assets/*"]
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
