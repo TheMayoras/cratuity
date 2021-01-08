@@ -8,10 +8,14 @@ use tui::{
     Frame,
 };
 
+#[cfg(not(feature = "no-copy"))]
 use clipboard::{ClipboardContext, ClipboardProvider};
 
+#[cfg(not(feature = "no-copy"))]
+use crate::crates_io::CrateSearch;
+
 use crate::{
-    crates_io::{CrateSearch, CrateSearchResponse, CrateSearcher, CratesSort},
+    crates_io::{CrateSearchResponse, CrateSearcher, CratesSort},
     input::InputEvent,
     widgets::{CrateWidget, InputWidget, SortingWidget},
 };
@@ -209,16 +213,7 @@ impl App {
                             self.mode = AppMode::Sorting(SortingField::from(&self.sort));
                         }
                         'c' | 'C' => {
-                            if let Some(selection) = self.selection {
-                                if let Some(ref crates) = self.crates {
-                                    let crte = crates.crates.get(selection);
-                                    let toml = crte.map(CrateSearch::get_toml_str);
-                                    let mut clipboard: ClipboardContext =
-                                        ClipboardProvider::new().unwrap();
-
-                                    toml.map(|toml| clipboard.set_contents(toml).unwrap());
-                                }
-                            }
+                            self.copy_selection();
                         }
                         _ => {}
                     },
@@ -285,4 +280,20 @@ impl App {
             None
         }
     }
+
+    #[cfg(not(feature = "no-copy"))]
+    fn copy_selection(&self) {
+        if let Some(selection) = self.selection {
+            if let Some(ref crates) = self.crates {
+                let crte = crates.crates.get(selection);
+                let toml = crte.map(CrateSearch::get_toml_str);
+                let mut clipboard: ClipboardContext = ClipboardProvider::new().unwrap();
+
+                toml.map(|toml| clipboard.set_contents(toml).unwrap());
+            }
+        }
+    }
+
+    #[cfg(feature = "no-copy")]
+    fn copy_selection(&self) {}
 }
