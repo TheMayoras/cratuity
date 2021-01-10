@@ -1,13 +1,8 @@
-use std::{
-    error::Error,
-    io,
-    io::Write,
-    sync::mpsc::{self},
-    thread,
-};
+use std::{error::Error, io, io::Write, thread};
 
 use app::App;
 
+use crossbeam_channel::unbounded;
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
@@ -25,7 +20,7 @@ mod input;
 mod widgets;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let (tx, rx) = mpsc::channel();
+    let (tx, rx) = unbounded();
     let clone = tx.clone();
     thread::spawn(move || InputMonitor::new(clone).monitor());
     let clone = tx.clone();

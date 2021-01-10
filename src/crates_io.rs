@@ -1,9 +1,7 @@
-use std::{
-    sync::mpsc::{self, Receiver, Sender},
-    thread,
-};
+use std::thread;
 
 use chrono::{DateTime, Local};
+use crossbeam_channel::{self, bounded, Receiver, Sender};
 use reqwest::{blocking::Client, Url};
 use serde::{Deserialize, Serialize};
 
@@ -133,7 +131,7 @@ pub struct CrateSearcher {
 
 impl CrateSearcher {
     pub fn new(input_tx: Sender<InputEvent>) -> Result<Self, reqwest::Error> {
-        let (tx, rx) = mpsc::channel();
+        let (tx, rx) = bounded(1);
         thread::spawn(move || CrateSearcherWorker::new(input_tx, rx).run());
         Ok(Self { tx })
     }

@@ -1,9 +1,6 @@
-use std::{
-    cmp,
-    sync::mpsc::{Receiver, Sender},
-    time::Duration,
-};
+use std::{cmp, time::Duration};
 
+use crossbeam_channel::{Receiver, Sender};
 use tui::{
     backend::Backend,
     layout::{Constraint, Layout},

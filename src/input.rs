@@ -1,5 +1,6 @@
-use std::{sync::mpsc::Sender, time::Duration};
+use std::time::Duration;
 
+use crossbeam_channel::Sender;
 use crossterm::event::{self, Event as TermEvent, KeyCode};
 
 use std::thread;
