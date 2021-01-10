@@ -13,9 +13,11 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use input::InputMonitor;
+use input::{InputMonitor, TickMonitor};
 
 use tui::{backend::CrosstermBackend, Terminal};
+
+const TICK_INTERVAL: u64 = 400;
 
 mod app;
 mod crates_io;
@@ -24,8 +26,11 @@ mod widgets;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let (tx, rx) = mpsc::channel();
-    thread::spawn(move || InputMonitor::new(tx).monitor());
-    let mut app = App::new(rx);
+    let clone = tx.clone();
+    thread::spawn(move || InputMonitor::new(clone).monitor());
+    let clone = tx.clone();
+    thread::spawn(move || TickMonitor::new(TICK_INTERVAL, clone).monitor());
+    let mut app = App::new(tx, rx);
 
     let mut stdout = io::stdout();
     enable_raw_mode()?;

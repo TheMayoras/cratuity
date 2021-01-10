@@ -2,11 +2,17 @@ use std::{sync::mpsc::Sender, time::Duration};
 
 use crossterm::event::{self, Event as TermEvent, KeyCode};
 
+use std::thread;
+
+use crate::crates_io::CrateSearchResponse;
+
 pub enum InputEvent {
     Char(char),
     Esc,
     Enter,
     Backspace,
+    Tick,
+    Results(CrateSearchResponse),
 }
 
 pub struct InputMonitor {
@@ -31,6 +37,24 @@ impl InputMonitor {
                     }
                 }
             }
+        }
+    }
+}
+
+pub struct TickMonitor {
+    interval: u64,
+    tx: Sender<InputEvent>,
+}
+
+impl TickMonitor {
+    pub fn new(interval: u64, tx: Sender<InputEvent>) -> Self {
+        Self { interval, tx }
+    }
+
+    pub fn monitor(&self) {
+        loop {
+            thread::sleep(Duration::from_millis(self.interval));
+            self.tx.send(InputEvent::Tick).unwrap();
         }
     }
 }

@@ -1,4 +1,8 @@
-use std::{cmp, sync::mpsc::Receiver, time::Duration};
+use std::{
+    cmp,
+    sync::mpsc::{Receiver, Sender},
+    time::Duration,
+};
 
 use tui::{
     backend::Backend,
@@ -48,7 +52,7 @@ impl From<&'_ CratesSort> for SortingField {
 
 pub enum AppMode {
     Normal,
-    Input(String),
+    Input(String, u64),
     Sorting(SortingField),
 }
 
@@ -65,15 +69,15 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(input_rx: Receiver<InputEvent>) -> Self {
+    pub fn new(input_tx: Sender<InputEvent>, input_rx: Receiver<InputEvent>) -> Self {
         Self {
             input_rx,
-            client: CrateSearcher::new().unwrap(),
+            client: CrateSearcher::new(input_tx).unwrap(),
             crates: None,
             quit: false,
             inpt: Some("".to_string()),
             page: 1,
-            mode: AppMode::Input("".to_string()),
+            mode: AppMode::Input("".to_string(), 0),
             sort: CratesSort::Relevance,
             selection: None,
         }
@@ -99,7 +103,7 @@ impl App {
             AppMode::Normal => {
                 Text::raw("Press N/P to move between pages.  Press f to search for a term\nPress J/K to change the highlighted Crate and press C to copy it's Cargo.toml string") 
             }
-            AppMode::Input(_) => {
+            AppMode::Input(_, _) => {
                 "Type to enter your search term.  Press Enter to confirm.  Press ESC to cancel".into()
             }
             AppMode::Sorting(_) => {
@@ -155,8 +159,9 @@ impl App {
 
     fn draw_mode<T: Backend>(&self, f: &mut Frame<T>) {
         match &self.mode {
-            AppMode::Input(msg) => {
-                let inpt = InputWidget::new("Enter you search term", msg.as_str());
+            AppMode::Input(msg, ticks) => {
+                let show_cursor = (ticks & 1) == 0;
+                let inpt = InputWidget::new("Enter you search term", msg.as_str(), show_cursor);
                 f.render_widget(inpt, f.size());
             }
             AppMode::Normal => {}
@@ -173,7 +178,7 @@ impl App {
                 AppMode::Normal => match inpt {
                     InputEvent::Char(c) => match c {
                         'f' | 'F' => {
-                            self.mode = AppMode::Input("".to_string());
+                            self.mode = AppMode::Input("".to_string(), 0);
                         }
                         'q' | 'Q' => {
                             self.quit = true;
@@ -217,9 +222,21 @@ impl App {
                         }
                         _ => {}
                     },
+                    InputEvent::Results(results) => {
+                        self.crates = Some(results);
+                        self.selection = if let Some(ref crates) = self.crates {
+                            if crates.crates.len() > 0 {
+                                Some(0)
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    }
                     _ => {}
                 },
-                AppMode::Input(ref mut msg) => match inpt {
+                AppMode::Input(ref mut msg, ref mut ticks) => match inpt {
                     InputEvent::Esc => self.mode = AppMode::Normal,
                     InputEvent::Enter => {
                         let replaced = std::mem::take(msg);
@@ -232,6 +249,21 @@ impl App {
                         let _ = msg.pop();
                     }
                     InputEvent::Char(c) => msg.push(c),
+                    InputEvent::Tick => {
+                        *ticks = ticks.wrapping_add(1);
+                    }
+                    InputEvent::Results(results) => {
+                        self.crates = Some(results);
+                        self.selection = if let Some(ref crates) = self.crates {
+                            if crates.crates.len() > 0 {
+                                Some(0)
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    }
                 },
                 AppMode::Sorting(SortingField {
                     selection,
@@ -246,14 +278,26 @@ impl App {
                         self.do_search();
                     }
                     InputEvent::Char(c) => match c {
-                        'p' | 'P' => {
+                        'k' | 'K' => {
                             *selection = selection.saturating_sub(1);
                         }
-                        'n' | 'N' => {
+                        'j' | 'J' => {
                             *selection = cmp::min(*selection + 1, 4);
                         }
                         _ => {}
                     },
+                    InputEvent::Results(results) => {
+                        self.crates = Some(results);
+                        self.selection = if let Some(ref crates) = self.crates {
+                            if crates.crates.len() > 0 {
+                                Some(0)
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    }
                     _ => {}
                 },
             }
@@ -262,23 +306,8 @@ impl App {
 
     fn do_search(&mut self) {
         let search = self.inpt.as_ref();
-        let resp = self
-            .client
+        self.client
             .search_sorted(search.unwrap(), self.page, &self.sort);
-        match resp {
-            Ok(crates) => self.crates = Some(crates),
-            Err(_) => self.crates = None,
-        }
-
-        self.selection = if let Some(ref crates) = self.crates {
-            if crates.crates.len() > 0 {
-                Some(0)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
     }
 
     #[cfg(not(feature = "no-copy"))]

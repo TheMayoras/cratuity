@@ -145,11 +145,16 @@ impl Widget for CrateWidget<'_> {
 pub struct InputWidget<'a, T> {
     title: T,
     inpt: &'a str,
+    show_cursor: bool,
 }
 
 impl<'a, T: AsRef<str>> InputWidget<'a, T> {
-    pub fn new(title: T, inpt: &'a str) -> Self {
-        Self { title, inpt }
+    pub fn new(title: T, inpt: &'a str, show_cursor: bool) -> Self {
+        Self {
+            title,
+            inpt,
+            show_cursor,
+        }
     }
 }
 impl<'a, T: AsRef<str>> InputWidget<'a, T> {
@@ -192,7 +197,12 @@ impl<'a, T: AsRef<str>> InputWidget<'a, T> {
 
 impl<'a, T: AsRef<str>> Widget for InputWidget<'a, T> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let inpt = format!("{}|", self.inpt);
+        let inpt = if self.show_cursor {
+            format!("{}|", self.inpt)
+        } else {
+            format!("{}", self.inpt)
+        };
+
         let inpt = Paragraph::new(inpt);
 
         let area = self.get_area(area);
