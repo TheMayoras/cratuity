@@ -23,6 +23,8 @@ tui = { version = "0.14", default-features = false, features = ['crossterm'] }
 serde = { version = "1.0.118", features = ["derive"] }
 chrono = { version = "0.4.19", features = ["serde"] }
 
+crossbeam-channel = "0.5.0"
+
 [features]
 default = ["clipboard"]
 
