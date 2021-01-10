@@ -1,6 +1,6 @@
 [package]
 name = "cratuity"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Ben Mayoras <ben.mayoras@gmail.com>"]
 edition = "2018"
 description = "A tui for searching crates.io"
