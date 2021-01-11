@@ -1,6 +1,6 @@
 use std::{sync::mpsc::Sender, time::Duration};
 
-use crossterm::event::{self, Event as TermEvent, KeyCode, Event};
+use crossterm::event::{self, Event, KeyCode};
 
 pub enum InputEvent {
     Char(char),
@@ -46,7 +46,7 @@ impl InputMonitor {
                         KeyCode::End => self.tx.send(InputEvent::End).unwrap(),
 
                         _ => {}
-                    }
+                    },
                     Event::Mouse(_) => {}
                     Event::Resize(_, _) => {
                         self.tx.send(InputEvent::Resize).unwrap();

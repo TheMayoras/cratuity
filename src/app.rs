@@ -118,11 +118,19 @@ impl App {
         let area = splits[0];
 
         if let Some(ref crates) = self.crates {
-            let message = Paragraph::new(format!("Page {} of {}", self.page, (crates.meta.total + 5) / 5));
+            let message = Paragraph::new(format!(
+                "Page {} of {}",
+                self.page,
+                (crates.meta.total + 5) / 5
+            ));
             f.render_widget(message, bot);
         }
 
-        if let Some(CrateSearchResponse { ref crates, ref meta }) = self.crates {
+        if let Some(CrateSearchResponse {
+            ref crates,
+            meta: ref _meta,
+        }) = self.crates
+        {
             let mut widgets = Vec::new();
             for (i, crte) in crates.iter().enumerate() {
                 if let Some(selection) = self.selection {
@@ -232,14 +240,11 @@ impl App {
         if let Some(cratex) = self.crates.as_ref() {
             self.selection = cratex.crates.len().checked_sub(1);
         }
-
     }
 
     pub fn await_input(&mut self) {
         if let Ok(inpt) = self.input_rx.recv_timeout(Duration::from_secs(1)) {
-            if let InputEvent::Resize = inpt {
-
-            }
+            if let InputEvent::Resize = inpt {}
             match &mut self.mode {
                 AppMode::Normal => match inpt {
                     InputEvent::Char(c) => match c {
@@ -275,13 +280,13 @@ impl App {
                     InputEvent::Up => {
                         self.prev_item();
                     }
-                    InputEvent::Right | InputEvent::PageDown  => {
+                    InputEvent::Right | InputEvent::PageDown => {
                         self.next_page();
                     }
                     InputEvent::Left | InputEvent::PageUp => {
                         self.prev_page();
                     }
-                        InputEvent::End  => {
+                    InputEvent::End => {
                         self.end();
                     }
                     InputEvent::Home => {
@@ -303,7 +308,7 @@ impl App {
                         let _ = msg.pop();
                     }
                     InputEvent::Char(c) => msg.push(c),
-                    _ => {},
+                    _ => {}
                 },
                 AppMode::Sorting(SortingField {
                     selection,
