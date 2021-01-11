@@ -48,7 +48,7 @@ impl<'a> CrateWidget<'a> {
             self.crte.created_at.format(STR_FORMAT).to_string()
         );
         let paragraph = Paragraph::new(paragraph.as_str())
-            .style(style.clone())
+            .style(style)
             .alignment(Left);
         paragraph.render(parts[0], buf);
 
@@ -57,19 +57,19 @@ impl<'a> CrateWidget<'a> {
             self.crte.updated_at.format(STR_FORMAT).to_string()
         );
         let paragraph = Paragraph::new(paragraph.as_str())
-            .style(style.clone())
+            .style(style)
             .alignment(Center);
         paragraph.render(parts[1], buf);
 
         let paragraph = format!("Downloads: {}", self.crte.downloads);
         let paragraph = Paragraph::new(paragraph.as_str())
-            .style(style.clone())
+            .style(style)
             .alignment(Center);
         paragraph.render(parts[2], buf);
 
         let paragraph = format!("Recent Downloads: {}", self.crte.recent_downloads);
         let paragraph = Paragraph::new(paragraph.as_str())
-            .style(style.clone())
+            .style(style)
             .alignment(Right);
         paragraph.render(parts[3], buf);
     }
