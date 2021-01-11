@@ -117,10 +117,12 @@ impl App {
         let bot = splits[1];
         let area = splits[0];
 
-        let message = Paragraph::new(format!("Page {}", self.page));
-        f.render_widget(message, bot);
+        if let Some(ref crates) = self.crates {
+            let message = Paragraph::new(format!("Page {} of {}", self.page, (crates.meta.total + 5) / 5));
+            f.render_widget(message, bot);
+        }
 
-        if let Some(CrateSearchResponse { ref crates }) = self.crates {
+        if let Some(CrateSearchResponse { ref crates, ref meta }) = self.crates {
             let mut widgets = Vec::new();
             for (i, crte) in crates.iter().enumerate() {
                 if let Some(selection) = self.selection {
@@ -156,19 +158,88 @@ impl App {
     fn draw_mode<T: Backend>(&self, f: &mut Frame<T>) {
         match &self.mode {
             AppMode::Input(msg) => {
-                let inpt = InputWidget::new("Enter you search term", msg.as_str());
+                let inpt = InputWidget::new("Enter your search term", msg.as_str());
                 f.render_widget(inpt, f.size());
             }
             AppMode::Normal => {}
             AppMode::Sorting(state) => {
-                let widget = SortingWidget::new(state, "Select you sorting method");
+                let widget = SortingWidget::new(state, "Select your sorting method");
                 f.render_widget(widget, f.size());
             }
         }
     }
 
+    fn next_item(&mut self) {
+        if let Some(selection) = self.selection {
+            if let Some(cratex) = self.crates.as_ref() {
+                if selection + 1 >= cratex.crates.len() {
+                    self.next_page();
+                } else {
+                    self.selection = Some(selection + 1);
+                }
+            }
+        }
+    }
+
+    fn prev_item(&mut self) {
+        if let Some(selection) = self.selection {
+            self.selection = if selection == 0 && self.page != 1 {
+                self.prev_page();
+                if let Some(cratex) = self.crates.as_ref() {
+                    Some(cratex.crates.len().saturating_sub(1))
+                } else {
+                    None
+                }
+            } else {
+                Some(selection.saturating_sub(1))
+            }
+        }
+    }
+
+    fn next_page(&mut self) {
+        if let Some(cratex) = self.crates.as_ref() {
+            if self.page as usize * 5 < cratex.meta.total {
+                self.selection = Some(0);
+                self.page += 1;
+                self.do_search();
+            }
+        }
+    }
+
+    fn prev_page(&mut self) {
+        if self.page > 1 {
+            self.selection = Some(0);
+            self.page -= 1;
+            self.do_search();
+        }
+    }
+
+    fn home(&mut self) {
+        self.selection = Some(0);
+        if self.page != 1 {
+            self.page = 1;
+            self.do_search();
+        }
+    }
+
+    fn end(&mut self) {
+        if let Some(cratex) = self.crates.as_ref() {
+            if self.page as usize * 5 < cratex.meta.total {
+                self.page = (cratex.meta.total as u32 + 5) / 5;
+                self.do_search();
+            }
+        }
+        if let Some(cratex) = self.crates.as_ref() {
+            self.selection = cratex.crates.len().checked_sub(1);
+        }
+
+    }
+
     pub fn await_input(&mut self) {
         if let Ok(inpt) = self.input_rx.recv_timeout(Duration::from_secs(1)) {
+            if let InputEvent::Resize = inpt {
+
+            }
             match &mut self.mode {
                 AppMode::Normal => match inpt {
                     InputEvent::Char(c) => match c {
@@ -179,35 +250,16 @@ impl App {
                             self.quit = true;
                         }
                         'n' | 'N' => {
-                            if self.crates.as_ref().map(|c| c.crates.len()).unwrap_or(0) > 0 {
-                                self.page += 1;
-                                self.do_search();
-                            }
+                            self.next_page();
                         }
                         'p' | 'P' => {
-                            if self.page > 1 {
-                                self.page -= 1;
-                                self.do_search();
-                            }
+                            self.prev_page();
                         }
                         'j' | 'J' => {
-                            if let Some(selection) = self.selection {
-                                self.selection = Some(cmp::min(
-                                    selection + 1,
-                                    self.crates
-                                        .as_ref()
-                                        .map(|resp| &resp.crates)
-                                        .map(|crates| crates.len() - 1)
-                                        .unwrap_or(0),
-                                ));
-                            }
+                            self.next_item();
                         }
                         'k' | 'K' => {
-                            if let Some(selection) = self.selection {
-                                if selection > 0 {
-                                    self.selection = Some(selection - 1);
-                                }
-                            }
+                            self.prev_item();
                         }
                         's' | 'S' => {
                             self.mode = AppMode::Sorting(SortingField::from(&self.sort));
@@ -217,6 +269,25 @@ impl App {
                         }
                         _ => {}
                     },
+                    InputEvent::Down => {
+                        self.next_item();
+                    }
+                    InputEvent::Up => {
+                        self.prev_item();
+                    }
+                    InputEvent::Right | InputEvent::PageDown  => {
+                        self.next_page();
+                    }
+                    InputEvent::Left | InputEvent::PageUp => {
+                        self.prev_page();
+                    }
+                        InputEvent::End  => {
+                        self.end();
+                    }
+                    InputEvent::Home => {
+                        self.home();
+                    }
+
                     _ => {}
                 },
                 AppMode::Input(ref mut msg) => match inpt {
@@ -232,6 +303,7 @@ impl App {
                         let _ = msg.pop();
                     }
                     InputEvent::Char(c) => msg.push(c),
+                    _ => {},
                 },
                 AppMode::Sorting(SortingField {
                     selection,
@@ -254,6 +326,12 @@ impl App {
                         }
                         _ => {}
                     },
+                    InputEvent::Right | InputEvent::Down => {
+                        *selection = cmp::min(*selection + 1, 4);
+                    }
+                    InputEvent::Left | InputEvent::Up => {
+                        *selection = selection.saturating_sub(1);
+                    }
                     _ => {}
                 },
             }

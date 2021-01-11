@@ -39,7 +39,15 @@ impl std::fmt::Display for CratesSort {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CrateSearchResponse {
+    pub meta: CrateSearchResponseMeta,
     pub crates: Vec<CrateSearch>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CrateSearchResponseMeta {
+    pub total: usize,
+    pub next_page: Option<String>,
+    pub prev_page: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
