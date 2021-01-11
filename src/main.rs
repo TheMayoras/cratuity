@@ -7,6 +7,7 @@ use std::{
 };
 
 use app::App;
+use clap::{App as ClapApp, Arg, ArgMatches};
 
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
@@ -23,6 +24,12 @@ mod input;
 mod widgets;
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let matches = parse_args();
+    if matches.is_present("help") {
+        println!("{}", matches.usage());
+        return Ok(());
+    }
+
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || InputMonitor::new(tx).monitor());
     let mut app = App::new(rx);
@@ -47,6 +54,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     disable_raw_mode()?;
     execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
-    terminal.clear();
+    terminal.clear().unwrap();
     Ok(())
+}
+
+fn parse_args() -> ArgMatches<'static> {
+    let app = ClapApp::new("Cratuity");
+    let app = app.arg(Arg::with_name("find").long("find").short("f"));
+    let app = app.arg(Arg::with_name("sort").long("sort").short("s"));
+
+    app.get_matches()
 }
