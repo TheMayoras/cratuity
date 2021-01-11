@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+
+use crate::ceil_div;
 use chrono::{DateTime, Local};
 use reqwest::{blocking::Client, Url};
 use serde::{Deserialize, Serialize};
@@ -45,7 +48,7 @@ pub struct CrateSearchResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CrateSearchResponseMeta {
-    pub total: usize,
+    pub total: u32,
     pub next_page: Option<String>,
     pub prev_page: Option<String>,
 }
@@ -68,7 +71,7 @@ pub struct CrateSearch {
 }
 
 impl CrateSearch {
-    #[cfg(not(feature = "no-copy"))]
+    #[cfg(feature = "clipboard")]
     pub fn get_toml_str(&self) -> String {
         format!("{} = \"{}\"", self.id, self.newest_version)
     }
@@ -87,6 +90,7 @@ pub struct CrateSearchLinks {
 /// A struct that will be used to search crates.io
 pub struct CrateSearcher {
     client: Client,
+    search_cache: HashMap<(String, String), (u32, HashMap<u32, CrateSearch>)>,
 }
 
 impl CrateSearcher {
@@ -95,15 +99,122 @@ impl CrateSearcher {
             client: Client::builder()
                 .user_agent("craters-tui-searcher")
                 .build()?,
+            search_cache: HashMap::new(),
         })
     }
 }
+fn get_all_items(
+    page_cache: &HashMap<u32, CrateSearch>,
+    page: u32,
+    items_per_page: u32,
+    total_num: u32,
+) -> Option<Vec<&CrateSearch>> {
+    let start = (page - 1) * items_per_page;
+    let end = page * items_per_page;
+    let mut res = Vec::with_capacity(items_per_page as usize);
+    for index in start..end.min(total_num) {
+        res.push(page_cache.get(&index)?);
+    }
+    Some(res)
+}
 
 impl CrateSearcher {
+    /// Adds the search query results to the internal cache.
+    pub fn search_and_add_to_cache<T: AsRef<str>>(
+        &mut self,
+        term: T,
+        page: u32,
+        items_per_page: u32,
+        sort: &CratesSort,
+    ) -> Result<(), reqwest::Error> {
+        let key = (term.as_ref().to_string(), sort.to_sort_string());
+        let resp = self.search_sorted(term, page, items_per_page, sort)?;
+        let start = (page - 1) * items_per_page;
+        let (total, page_cache) = self.search_cache.entry(key).or_insert((0, HashMap::new()));
+        for (ind, item) in resp.crates.into_iter().enumerate() {
+            page_cache.insert(start + ind as u32, item);
+        }
+        *total = resp.meta.total;
+        Ok(())
+    }
+
+    /// Searches the query, defaulting to data available in the cache. If not cached, cache is updated
+    /// to include new values. May fetch more items at once to prevent excessive API requests.
+    pub fn search_sorted_with_cache<T: AsRef<str>>(
+        &mut self,
+        term: T,
+        page: u32,
+        items_per_page: u32,
+        sort: &CratesSort,
+    ) -> Result<(u32, Vec<&CrateSearch>), reqwest::Error> {
+        let key = (term.as_ref().to_string(), sort.to_sort_string());
+        if !self.search_cache.contains_key(&key) {
+            self.search_and_add_to_cache(
+                term.as_ref(),
+                ceil_div(page, 10),
+                10 * items_per_page,
+                sort,
+            )?;
+            return Ok(self
+                .search_sorted_cached(term.as_ref(), page, items_per_page, sort)
+                .unwrap());
+        }
+
+        if self.check_page_cached(term.as_ref(), page, items_per_page, sort) {
+            return Ok(self
+                .search_sorted_cached(term.as_ref(), page, items_per_page, sort)
+                .unwrap());
+        }
+
+        // This thrashes the cache if the page size changes between calls.
+        self.search_and_add_to_cache(term.as_ref(), ceil_div(page, 10), 10 * items_per_page, sort)?;
+        let (total_num, page_cache) = self.search_cache.get(&key).unwrap();
+        let res = get_all_items(page_cache, page, items_per_page, *total_num).unwrap();
+        Ok((*total_num, res))
+    }
+
+    /// Checks if the given page is cached.
+    fn check_page_cached<T: AsRef<str>>(
+        &self,
+        term: T,
+        page: u32,
+        items_per_page: u32,
+        sort: &CratesSort,
+    ) -> bool {
+        let key = (term.as_ref().to_string(), sort.to_sort_string());
+        if let Some((total_num, page_cache)) = self.search_cache.get(&key) {
+            let start = (page - 1) * items_per_page;
+            let end = page * items_per_page;
+            (start..end.min(*total_num))
+                .map(|x| page_cache.get(&x).is_some())
+                .all(|x| x)
+        } else {
+            false
+        }
+    }
+
+    /// Searches the query and associated pages from the internal cache.
+    pub fn search_sorted_cached<T: AsRef<str>>(
+        &self,
+        term: T,
+        page: u32,
+        items_per_page: u32,
+        sort: &CratesSort,
+    ) -> Option<(u32, Vec<&CrateSearch>)> {
+        let key = (term.as_ref().to_string(), sort.to_sort_string());
+        let (total_num, page_cache) = self.search_cache.get(&key)?;
+        Some((
+            *total_num,
+            get_all_items(page_cache, page, items_per_page, *total_num)?,
+        ))
+    }
+
+    /// Searches the query without any caching.
     pub fn search_sorted<T: AsRef<str>>(
         &self,
         term: T,
         page: u32,
+        items_per_page: u32,
         sort: &CratesSort,
     ) -> Result<CrateSearchResponse, reqwest::Error> {
         // https://crates.io/api/v1/crates?page=1&per_page=10&q=serde
@@ -111,7 +222,7 @@ impl CrateSearcher {
         let url = url
             .query_pairs_mut()
             .append_pair("page", page.to_string().as_str())
-            .append_pair("per_page", "5")
+            .append_pair("per_page", items_per_page.to_string().as_str())
             .append_pair("q", term.as_ref())
             .append_pair("sort", sort.to_sort_string().as_str())
             .finish();

@@ -23,6 +23,16 @@ mod crates_io;
 mod input;
 mod widgets;
 
+pub(crate) fn ceil_div(a: u32, b: u32) -> u32 {
+    if b == 0 {
+        panic!("attempt to divide by zero");
+    } else if a == 0 {
+        0
+    } else {
+        (a + b - 1) / b
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let matches = parse_args();
     if matches.is_present("help") {

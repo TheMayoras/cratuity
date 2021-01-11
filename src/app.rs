@@ -8,14 +8,15 @@ use tui::{
     Frame,
 };
 
-#[cfg(not(feature = "no-copy"))]
+#[cfg(feature = "clipboard")]
 use clipboard::{ClipboardContext, ClipboardProvider};
 
-#[cfg(not(feature = "no-copy"))]
+#[cfg(feature = "clipboard")]
 use crate::crates_io::CrateSearch;
 
 use crate::{
-    crates_io::{CrateSearchResponse, CrateSearcher, CratesSort},
+    ceil_div,
+    crates_io::{CrateSearcher, CratesSort},
     input::InputEvent,
     widgets::{CrateWidget, InputWidget, SortingWidget},
 };
@@ -55,10 +56,10 @@ pub enum AppMode {
 pub struct App {
     input_rx: Receiver<InputEvent>,
     client: CrateSearcher,
-    pub crates: Option<CrateSearchResponse>,
     pub quit: bool,
     inpt: Option<String>,
     page: u32,
+    items_per_page: u32,
     sort: CratesSort,
     mode: AppMode,
     selection: Option<usize>,
@@ -69,10 +70,10 @@ impl App {
         Self {
             input_rx,
             client: CrateSearcher::new().unwrap(),
-            crates: None,
             quit: false,
             inpt: Some("".to_string()),
             page: 1,
+            items_per_page: 5,
             mode: AppMode::Input("".to_string()),
             sort: CratesSort::Relevance,
             selection: None,
@@ -117,20 +118,11 @@ impl App {
         let bot = splits[1];
         let area = splits[0];
 
-        if let Some(ref crates) = self.crates {
-            let message = Paragraph::new(format!(
-                "Page {} of {}",
-                self.page,
-                (crates.meta.total + 5) / 5
-            ));
+        if let Some((total, crates)) = self.get_cached_crates() {
+            let message =
+                Paragraph::new(format!("Page {} of {}", self.page, self.num_pages(total)));
             f.render_widget(message, bot);
-        }
 
-        if let Some(CrateSearchResponse {
-            ref crates,
-            meta: ref _meta,
-        }) = self.crates
-        {
             let mut widgets = Vec::new();
             for (i, crte) in crates.iter().enumerate() {
                 if let Some(selection) = self.selection {
@@ -140,17 +132,19 @@ impl App {
                 }
             }
 
+            let mut raw = vec![100u16 / (self.items_per_page as u16); self.items_per_page as usize];
+            let sum_diff = 100 - raw.iter().sum::<u16>();
+            if sum_diff != 0 {
+                for item in raw[..sum_diff as usize].iter_mut() {
+                    *item += 1;
+                }
+            }
             let splits = Layout::default()
                 .horizontal_margin(1)
                 .constraints(
-                    [
-                        Constraint::Percentage(20),
-                        Constraint::Percentage(20),
-                        Constraint::Percentage(20),
-                        Constraint::Percentage(20),
-                        Constraint::Percentage(20),
-                    ]
-                    .as_ref(),
+                    raw.into_iter()
+                        .map(Constraint::Percentage)
+                        .collect::<Vec<_>>(),
                 )
                 .split(area);
             widgets
@@ -179,8 +173,8 @@ impl App {
 
     fn next_item(&mut self) {
         if let Some(selection) = self.selection {
-            if let Some(cratex) = self.crates.as_ref() {
-                if selection + 1 >= cratex.crates.len() {
+            if let Some((_, crates)) = self.get_cached_crates() {
+                if selection + 1 >= crates.len() {
                     self.next_page();
                 } else {
                     self.selection = Some(selection + 1);
@@ -193,8 +187,8 @@ impl App {
         if let Some(selection) = self.selection {
             self.selection = if selection == 0 && self.page != 1 {
                 self.prev_page();
-                if let Some(cratex) = self.crates.as_ref() {
-                    Some(cratex.crates.len().saturating_sub(1))
+                if let Some((_, crates)) = self.get_cached_crates() {
+                    Some(crates.len().saturating_sub(1))
                 } else {
                     None
                 }
@@ -205,8 +199,8 @@ impl App {
     }
 
     fn next_page(&mut self) {
-        if let Some(cratex) = self.crates.as_ref() {
-            if self.page as usize * 5 < cratex.meta.total {
+        if let Some((total, _)) = self.get_cached_crates() {
+            if self.page * self.items_per_page < total {
                 self.selection = Some(0);
                 self.page += 1;
                 self.do_search();
@@ -230,15 +224,19 @@ impl App {
         }
     }
 
+    fn num_pages(&self, num_items: u32) -> u32 {
+        ceil_div(num_items, self.items_per_page)
+    }
+
     fn end(&mut self) {
-        if let Some(cratex) = self.crates.as_ref() {
-            if self.page as usize * 5 < cratex.meta.total {
-                self.page = (cratex.meta.total as u32 + 5) / 5;
+        if let Some((total, _)) = self.get_cached_crates() {
+            if self.page * self.items_per_page < total {
+                self.page = self.num_pages(total);
                 self.do_search();
             }
         }
-        if let Some(cratex) = self.crates.as_ref() {
-            self.selection = cratex.crates.len().checked_sub(1);
+        if let Some((_, crates)) = self.get_cached_crates() {
+            self.selection = crates.len().checked_sub(1).map(|t| t as usize);
         }
     }
 
@@ -343,40 +341,41 @@ impl App {
         }
     }
 
+    fn get_cached_crates(&self) -> Option<(u32, Vec<&CrateSearch>)> {
+        let search = self.inpt.as_ref();
+        self.client.search_sorted_cached(
+            search.unwrap(),
+            self.page,
+            self.items_per_page,
+            &self.sort,
+        )
+    }
+
     fn do_search(&mut self) {
         let search = self.inpt.as_ref();
-        let resp = self
+        let (_, crates) = self
             .client
-            .search_sorted(search.unwrap(), self.page, &self.sort);
-        match resp {
-            Ok(crates) => self.crates = Some(crates),
-            Err(_) => self.crates = None,
-        }
-
-        self.selection = if let Some(ref crates) = self.crates {
-            if crates.crates.len() > 0 {
-                Some(0)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
+            .search_sorted_with_cache(search.unwrap(), self.page, self.items_per_page, &self.sort)
+            .unwrap_or((0, vec![]));
+        self.selection = if crates.is_empty() { None } else { Some(0) }
     }
 
-    #[cfg(not(feature = "no-copy"))]
+    #[cfg(feature = "clipboard")]
     fn copy_selection(&self) {
         if let Some(selection) = self.selection {
-            if let Some(ref crates) = self.crates {
-                let crte = crates.crates.get(selection);
-                let toml = crte.map(CrateSearch::get_toml_str);
+            if let Some((_, crates)) = self.get_cached_crates() {
+                let toml = crates
+                    .get(selection)
+                    .map(|x| CrateSearch::get_toml_str(x.to_owned()));
                 let mut clipboard: ClipboardContext = ClipboardProvider::new().unwrap();
 
-                toml.map(|toml| clipboard.set_contents(toml).unwrap());
+                if let Some(toml) = toml {
+                    clipboard.set_contents(toml).unwrap()
+                }
             }
         }
     }
 
-    #[cfg(feature = "no-copy")]
+    #[cfg(not(feature = "clipboard"))]
     fn copy_selection(&self) {}
 }
