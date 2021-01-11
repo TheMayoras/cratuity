@@ -236,7 +236,7 @@ impl App {
             }
         }
         if let Some((_, crates)) = self.get_cached_crates() {
-            self.selection = crates.len().checked_sub(1).map(|t| t as usize);
+            self.selection = crates.len().checked_sub(1);
         }
     }
 
