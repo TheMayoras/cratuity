@@ -47,6 +47,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     disable_raw_mode()?;
     execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
-
+    terminal.clear();
     Ok(())
 }
