@@ -1,3 +1,12 @@
+#![deny(
+    clippy::all,
+    clippy::correctness,
+    clippy::style,
+    clippy::complexity,
+    clippy::perf,
+    clippy::cargo
+)]
+
 use std::{
     error::Error,
     io,
