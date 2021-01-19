@@ -244,7 +244,7 @@ impl CrateSearcher {
         items_per_page: u32,
         sort: &CratesSort,
     ) -> Result<CrateSearchResponse, reqwest::Error> {
-        self.search_sorted_count(term, page, 5, sort)
+        self.search_sorted_count(term, page, items_per_page, sort)
     }
 
     pub fn search_sorted_count<T: AsRef<str>>(
