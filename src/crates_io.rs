@@ -1,13 +1,15 @@
 use std::collections::HashMap;
 
 use crate::ceil_div;
+use std::str::FromStr;
+
 use chrono::{DateTime, Local};
 use reqwest::{blocking::Client, Url};
 use serde::{Deserialize, Serialize};
 
 const CRATES_URL: &str = "https://crates.io/api/v1/crates";
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CratesSort {
     Relevance,
     AllTimeDownload,
@@ -24,6 +26,31 @@ impl CratesSort {
             CratesSort::RecentDownload => "recent-downloads".to_string(),
             CratesSort::RecentUpdate => "recent-updates".to_string(),
             CratesSort::NewlyAdded => "new".to_string(),
+        }
+    }
+}
+
+impl Default for CratesSort {
+    fn default() -> Self {
+        Self::Relevance
+    }
+}
+
+impl FromStr for CratesSort {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "relevance" => Ok(Self::Relevance),
+            "all time downloaded" | "all-time-downloaded" | "all_time_downloaded" => {
+                Ok(Self::Relevance)
+            }
+            "recent downloaded" | "recent-downloaded" | "recent_downloaded" => {
+                Ok(Self::RecentDownload)
+            }
+            "recent update" | "recent-update" | "recent_update" => Ok(Self::RecentUpdate),
+            "newly added" | "newly-added" | "newly_added" => Ok(Self::NewlyAdded),
+            _ => Err(format!("Unknown sort method {}", s)),
         }
     }
 }
@@ -217,20 +244,28 @@ impl CrateSearcher {
         items_per_page: u32,
         sort: &CratesSort,
     ) -> Result<CrateSearchResponse, reqwest::Error> {
+        self.search_sorted_count(term, page, 5, sort)
+    }
+
+    pub fn search_sorted_count<T: AsRef<str>>(
+        &self,
+        term: T,
+        page: u32,
+        count: u32,
+        sort: &CratesSort,
+    ) -> Result<CrateSearchResponse, reqwest::Error> {
         // https://crates.io/api/v1/crates?page=1&per_page=10&q=serde
         let mut url = Url::parse(CRATES_URL).unwrap();
         let url = url
             .query_pairs_mut()
             .append_pair("page", page.to_string().as_str())
-            .append_pair("per_page", items_per_page.to_string().as_str())
+            .append_pair("per_page", count.to_string().as_str())
             .append_pair("q", term.as_ref())
             .append_pair("sort", sort.to_sort_string().as_str())
             .finish();
 
         let req = self.client.get(url.as_str()).build()?;
-        self.client.execute(req).map(|resp| {
-            resp.json::<CrateSearchResponse>()
-                .expect("Unable to deserialize the crate search response")
-        })
+        let resp = self.client.execute(req)?;
+        Ok(resp.json::<CrateSearchResponse>()?)
     }
 }

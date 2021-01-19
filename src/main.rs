@@ -7,16 +7,20 @@ use std::{
 };
 
 use app::App;
-use clap::{App as ClapApp, Arg, ArgMatches};
 
+use crates_io::{CrateSearchResponse, CrateSearcher, CratesSort};
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{
+        disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, ScrollUp,
+    },
 };
 use input::InputMonitor;
 
-use tui::{backend::CrosstermBackend, Terminal};
+use structopt::StructOpt;
+
+use tui::{backend::CrosstermBackend, layout::Rect, widgets::Paragraph, Terminal};
 
 mod app;
 mod crates_io;
@@ -33,10 +37,34 @@ pub(crate) fn ceil_div(a: u32, b: u32) -> u32 {
     }
 }
 
+#[derive(Debug, StructOpt)]
+#[structopt(name = "Cratuity", about = "A simple TUI for searching Crates.io")]
+/// A TUI for searching crates.io in the terminal.  
+///
+/// Alternatively, the find option may be used to bypass the TUI and output the
+/// results directly to the terminal.
+pub struct AppArgs {
+    #[structopt(short, long)]
+    pub find: Option<String>,
+
+    #[structopt(short, long, default_value)]
+    pub sort: CratesSort,
+
+    #[structopt(short, long, default_value = "5")]
+    pub count: usize,
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    let matches = parse_args();
+    let matches = AppArgs::clap().get_matches();
     if matches.is_present("help") {
         println!("{}", matches.usage());
+        return Ok(());
+    }
+
+    let args: AppArgs = AppArgs::from_clap(&matches);
+    if let Some(find) = args.find {
+        cli_search(find.as_str(), args.sort, args.count)?;
+
         return Ok(());
     }
 
@@ -68,10 +96,24 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn parse_args() -> ArgMatches<'static> {
-    let app = ClapApp::new("Cratuity");
-    let app = app.arg(Arg::with_name("find").long("find").short("f"));
-    let app = app.arg(Arg::with_name("sort").long("sort").short("s"));
+fn cli_search(term: &str, sort: CratesSort, count: usize) -> Result<(), Box<dyn Error>> {
+    let crate_search = CrateSearcher::new()?;
+    let resp = crate_search.search_sorted_count(term, 1, count as u32, &sort)?;
+    print_crates_table(resp)
+}
 
-    app.get_matches()
+fn print_crates_table(crates: CrateSearchResponse) -> Result<(), Box<dyn Error>> {
+    // Print a table with TUI
+    let mut stdout = io::stdout();
+    execute!(stdout, ScrollUp(10))?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+    let (_, cursor_y) = terminal.get_cursor()?;
+    terminal.set_cursor(0, cursor_y - 10)?;
+
+    let (_, cursor_y) = terminal.get_cursor()?;
+    let window = terminal.get_frame().size();
+    let area = Rect::new(0, cursor_y, window.width, window.height - cursor_y);
+
+    Ok(())
 }
