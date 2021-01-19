@@ -71,7 +71,7 @@ pub struct CrateSearch {
 }
 
 impl CrateSearch {
-    #[cfg(feature = "clipboard")]
+    #[cfg(not(feature = "no-copy"))]
     pub fn get_toml_str(&self) -> String {
         format!("{} = \"{}\"", self.id, self.newest_version)
     }

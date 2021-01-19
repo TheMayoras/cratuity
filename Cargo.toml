@@ -29,3 +29,4 @@ clap = "2.3.3"
 default = ["clipboard"]
 
 no-copy = []
+

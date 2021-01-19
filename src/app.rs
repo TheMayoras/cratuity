@@ -8,10 +8,9 @@ use tui::{
     Frame,
 };
 
-#[cfg(feature = "clipboard")]
+#[cfg(not(feature = "no-copy"))]
 use clipboard::{ClipboardContext, ClipboardProvider};
 
-#[cfg(feature = "clipboard")]
 use crate::crates_io::CrateSearch;
 
 use crate::{
@@ -360,7 +359,7 @@ impl App {
         self.selection = if crates.is_empty() { None } else { Some(0) }
     }
 
-    #[cfg(feature = "clipboard")]
+    #[cfg(not(feature = "no-copy"))]
     fn copy_selection(&self) {
         if let Some(selection) = self.selection {
             if let Some((_, crates)) = self.get_cached_crates() {
@@ -376,6 +375,6 @@ impl App {
         }
     }
 
-    #[cfg(not(feature = "clipboard"))]
+    #[cfg(feature = "no-copy")]
     fn copy_selection(&self) {}
 }
