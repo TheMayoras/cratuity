@@ -17,7 +17,7 @@ use tui::{
 
 use crate::{app::SortingField, crates_io::CrateSearch};
 
-const STR_FORMAT: &str = "%x %H:%M";
+pub const STR_FORMAT: &str = "%x %H:%M";
 
 pub struct CrateWidget<'a> {
     crte: &'a CrateSearch,

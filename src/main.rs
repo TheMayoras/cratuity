@@ -8,24 +8,26 @@ use std::{
 
 use app::App;
 
-use crates_io::{CrateSearchResponse, CrateSearcher, CratesSort};
+use crates_io::{CrateSearch, CrateSearchResponse, CrateSearcher, CratesSort};
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
-    terminal::{
-        disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen, ScrollUp,
-    },
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use input::InputMonitor;
 
+use comfy_table::{ContentArrangement, Row, Table, ToRow};
 use structopt::StructOpt;
 
-use tui::{backend::CrosstermBackend, layout::Rect, widgets::Paragraph, Terminal};
+use tui::{backend::CrosstermBackend, Terminal};
+use widgets::STR_FORMAT;
 
 mod app;
 mod crates_io;
 mod input;
 mod widgets;
+
+const TABLE_STYLE: &'static str = "││ ─├─┼┤│─┼├┤ ┴  └┘";
 
 pub(crate) fn ceil_div(a: u32, b: u32) -> u32 {
     if b == 0 {
@@ -103,17 +105,42 @@ fn cli_search(term: &str, sort: CratesSort, count: usize) -> Result<(), Box<dyn 
 }
 
 fn print_crates_table(crates: CrateSearchResponse) -> Result<(), Box<dyn Error>> {
-    // Print a table with TUI
-    let mut stdout = io::stdout();
-    execute!(stdout, ScrollUp(10))?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-    let (_, cursor_y) = terminal.get_cursor()?;
-    terminal.set_cursor(0, cursor_y - 10)?;
+    let mut table = Table::new();
+    table.set_content_arrangement(ContentArrangement::Dynamic);
+    table.load_preset(TABLE_STYLE);
 
-    let (_, cursor_y) = terminal.get_cursor()?;
-    let window = terminal.get_frame().size();
-    let area = Rect::new(0, cursor_y, window.width, window.height - cursor_y);
+    table.set_header(vec![
+        "Name",
+        "Created",
+        "Updated",
+        "Downloads",
+        "Recent Downloads",
+        "Max Version",
+        "Newest Version",
+        "Description",
+    ]);
+
+    for crte in crates.crates {
+        table.add_row(crte);
+    }
+
+    println!("{}", table);
 
     Ok(())
+}
+
+impl ToRow for CrateSearch {
+    fn to_row(self) -> Row {
+        let desc = self.description.unwrap_or("".to_string());
+        Row::from(vec![
+            self.name,
+            self.created_at.format(STR_FORMAT).to_string(),
+            self.updated_at.format(STR_FORMAT).to_string(),
+            self.downloads.to_string(),
+            self.recent_downloads.to_string(),
+            self.max_version,
+            self.newest_version,
+            desc,
+        ])
+    }
 }

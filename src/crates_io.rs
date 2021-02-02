@@ -42,10 +42,10 @@ impl FromStr for CratesSort {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "relevance" => Ok(Self::Relevance),
-            "all time downloaded" | "all-time-downloaded" | "all_time_downloaded" => {
+            "all time downloads" | "all-time-downloads" | "all_time_downloads" => {
                 Ok(Self::Relevance)
             }
-            "recent downloaded" | "recent-downloaded" | "recent_downloaded" => {
+            "recent downloads" | "recent-downloads" | "recent_downloads" => {
                 Ok(Self::RecentDownload)
             }
             "recent update" | "recent-update" | "recent_update" => Ok(Self::RecentUpdate),
@@ -251,7 +251,7 @@ impl CrateSearcher {
         &self,
         term: T,
         page: u32,
-        count: u32,
+        items_per_page: u32,
         sort: &CratesSort,
     ) -> Result<CrateSearchResponse, reqwest::Error> {
         // https://crates.io/api/v1/crates?page=1&per_page=10&q=serde
@@ -259,7 +259,7 @@ impl CrateSearcher {
         let url = url
             .query_pairs_mut()
             .append_pair("page", page.to_string().as_str())
-            .append_pair("per_page", count.to_string().as_str())
+            .append_pair("per_page", items_per_page.to_string().as_str())
             .append_pair("q", term.as_ref())
             .append_pair("sort", sort.to_sort_string().as_str())
             .finish();
