@@ -35,16 +35,17 @@ impl InputMonitor {
                         KeyCode::Esc => self.tx.send(InputEvent::Esc).unwrap(),
                         KeyCode::Enter => self.tx.send(InputEvent::Enter).unwrap(),
                         KeyCode::Backspace => self.tx.send(InputEvent::Backspace).unwrap(),
-                        KeyCode::Char(c) => self.tx.send(InputEvent::Char(c)).unwrap(),
                         KeyCode::Right => self.tx.send(InputEvent::Right).unwrap(),
                         KeyCode::Left => self.tx.send(InputEvent::Left).unwrap(),
                         KeyCode::Up => self.tx.send(InputEvent::Up).unwrap(),
                         KeyCode::Down => self.tx.send(InputEvent::Down).unwrap(),
                         KeyCode::PageUp => self.tx.send(InputEvent::PageUp).unwrap(),
                         KeyCode::PageDown => self.tx.send(InputEvent::PageDown).unwrap(),
-                        KeyCode::Home => self.tx.send(InputEvent::Home).unwrap(),
-                        KeyCode::End => self.tx.send(InputEvent::End).unwrap(),
-
+                        KeyCode::Home | KeyCode::Char('g') => {
+                            self.tx.send(InputEvent::Home).unwrap()
+                        }
+                        KeyCode::End | KeyCode::Char('G') => self.tx.send(InputEvent::End).unwrap(),
+                        KeyCode::Char(c) => self.tx.send(InputEvent::Char(c)).unwrap(),
                         _ => {}
                     },
                     Event::Mouse(_) => {}

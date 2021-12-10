@@ -25,6 +25,7 @@ use widgets::STR_FORMAT;
 mod app;
 mod crates_io;
 mod input;
+mod toast;
 mod widgets;
 
 const TABLE_STYLE: &'static str = "││ ─├─┼┤│─┼├┤ ┴  └┘";
@@ -94,7 +95,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     disable_raw_mode()?;
     execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
-    terminal.clear().unwrap();
+    // terminal.clear().unwrap();
     Ok(())
 }
 

@@ -1,5 +1,6 @@
+use std::collections::VecDeque;
+use std::error::Error;
 use std::{cmp, sync::mpsc::Receiver, time::Duration};
-
 use tui::{
     backend::Backend,
     layout::{Constraint, Layout},
@@ -11,7 +12,8 @@ use tui::{
 #[cfg(not(feature = "no-copy"))]
 use clipboard::{ClipboardContext, ClipboardProvider};
 
-use crate::crates_io::CrateSearch;
+use crate::toast::ToastState;
+use crate::{crates_io::CrateSearch, toast::ToastMessage};
 
 use crate::{
     ceil_div,
@@ -62,6 +64,8 @@ pub struct App {
     sort: CratesSort,
     mode: AppMode,
     selection: Option<usize>,
+    /// a queue of toast messages to display to the user
+    toast: VecDeque<ToastState>,
 }
 
 impl App {
@@ -76,10 +80,11 @@ impl App {
             mode: AppMode::Input("".to_string()),
             sort: CratesSort::Relevance,
             selection: None,
+            toast: VecDeque::new(),
         }
     }
 
-    pub fn draw<T: Backend>(&self, f: &mut Frame<T>) {
+    pub fn draw<T: Backend>(&mut self, f: &mut Frame<T>) {
         let size = f.size();
         let block = Block::default()
             .title("Cratuity (A crates.io quick search TUI)")
@@ -154,6 +159,10 @@ impl App {
 
         f.render_widget(block, size);
         self.draw_mode(f);
+
+        self.toast
+            .front_mut()
+            .map(|toast| f.render_stateful_widget(ToastMessage {}, size, toast));
     }
 
     fn draw_mode<T: Backend>(&self, f: &mut Frame<T>) {
@@ -241,7 +250,6 @@ impl App {
 
     pub fn await_input(&mut self) {
         if let Ok(inpt) = self.input_rx.recv_timeout(Duration::from_secs(1)) {
-            if let InputEvent::Resize = inpt {}
             match &mut self.mode {
                 AppMode::Normal => match inpt {
                     InputEvent::Char(c) => match c {
@@ -267,7 +275,12 @@ impl App {
                             self.mode = AppMode::Sorting(SortingField::from(&self.sort));
                         }
                         'c' | 'C' => {
-                            self.copy_selection();
+                            if let Err(msg) = self.copy_selection() {
+                                self.toast.push_back(ToastState::err(
+                                    Some("Clipboard Error".to_string()),
+                                    format!("{}", msg),
+                                ))
+                            };
                         }
                         _ => {}
                     },
@@ -338,6 +351,12 @@ impl App {
                 },
             }
         }
+
+        if let Some(toast) = self.toast.front() {
+            if toast.is_started() && toast.is_duration_passed() {
+                self.toast.pop_front();
+            }
+        }
     }
 
     fn get_cached_crates(&self) -> Option<(u32, Vec<&CrateSearch>)> {
@@ -360,21 +379,27 @@ impl App {
     }
 
     #[cfg(not(feature = "no-copy"))]
-    fn copy_selection(&self) {
+    fn copy_selection(&self) -> Result<(), Box<dyn Error>> {
         if let Some(selection) = self.selection {
             if let Some((_, crates)) = self.get_cached_crates() {
                 let toml = crates
                     .get(selection)
                     .map(|x| CrateSearch::get_toml_str(x.to_owned()));
-                let mut clipboard: ClipboardContext = ClipboardProvider::new().unwrap();
+                let mut clipboard: ClipboardContext = ClipboardProvider::new()
+                    .map_err(|_err| Box::<dyn Error>::from("Error setting clipboard contents"))?;
 
                 if let Some(toml) = toml {
-                    clipboard.set_contents(toml).unwrap()
+                    clipboard.set_contents(toml).map_err(|_err| {
+                        Box::<dyn Error>::from("Error setting clipboard contents")
+                    })?;
                 }
             }
         }
+        Ok(())
     }
 
     #[cfg(feature = "no-copy")]
-    fn copy_selection(&self) {}
+    fn copy_selection(&self) -> Result<(), Box<dyn Error>> {
+        Err("Feature Disabled".into())
+    }
 }

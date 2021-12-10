@@ -164,7 +164,7 @@ impl<'a, T: AsRef<str>> InputWidget<'a, T> {
             .constraints(
                 [
                     Constraint::Length(horz_pad),
-                    Constraint::Min(len),
+                    Constraint::Min(len + 2),
                     Constraint::Length(horz_pad),
                 ]
                 .as_ref(),
