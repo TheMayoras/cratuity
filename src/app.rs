@@ -9,7 +9,7 @@ use tui::{
     Frame,
 };
 
-#[cfg(not(feature = "no-copy"))]
+#[cfg(feature = "copy")]
 use clipboard::{ClipboardContext, ClipboardProvider};
 
 use crate::toast::ToastState;
@@ -253,26 +253,20 @@ impl App {
             match &mut self.mode {
                 AppMode::Normal => match inpt {
                     InputEvent::Char(c) => match c {
-                        'f' | 'F' => {
-                            self.mode = AppMode::Input("".to_string());
-                        }
-                        'q' | 'Q' => {
-                            self.quit = true;
-                        }
-                        'n' | 'N' => {
-                            self.next_page();
-                        }
-                        'p' | 'P' => {
-                            self.prev_page();
-                        }
-                        'j' | 'J' => {
-                            self.next_item();
-                        }
-                        'k' | 'K' => {
-                            self.prev_item();
-                        }
-                        's' | 'S' => {
-                            self.mode = AppMode::Sorting(SortingField::from(&self.sort));
+                        'f' | 'F' => self.mode = AppMode::Input("".to_string()),
+                        'q' | 'Q' => self.quit = true,
+                        'n' | 'N' => self.next_page(),
+                        'p' | 'P' => self.prev_page(),
+                        'j' | 'J' => self.next_item(),
+                        'k' | 'K' => self.prev_item(),
+                        's' | 'S' => self.mode = AppMode::Sorting(SortingField::from(&self.sort)),
+                        'o' | 'O' => {
+                            if let Err(msg) = self.open_selection() {
+                                self.toast.push_back(ToastState::err(
+                                    Some("Cannot open in browser"),
+                                    format!("{}", msg).as_str(),
+                                ))
+                            }
                         }
                         'c' | 'C' => {
                             if let Err(msg) = self.copy_selection() {
@@ -384,7 +378,35 @@ impl App {
         self.selection = if crates.is_empty() { None } else { Some(0) }
     }
 
-    #[cfg(not(feature = "no-copy"))]
+    #[cfg(feature = "browser")]
+    fn open_selection(&self) -> Result<(), Box<dyn Error>> {
+        if let Some(selection) = self.selection {
+            if let Some((_, crates)) = self.get_cached_crates() {
+                if let Some(crte) = crates.get(selection) {
+                    if let Some(docs) = &crte.documentation {
+                        open::that(docs).map_err(|err| {
+                            Box::<dyn Error>::from(format!(
+                                "Error opening documentation in browser.\n{}",
+                                err
+                            ))
+                        })?
+                    } else {
+                        Err(Box::<dyn Error>::from(
+                            "No documentation link for is given for this crate!",
+                        ))?
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+    #[cfg(not(feature = "browser"))]
+    fn open_selection(&self) -> Result<(), Box<dyn Error>> {
+        Err(Box::<dyn Error>::from("Feature Disabled"))
+    }
+
+    #[cfg(feature = "copy")]
     fn copy_selection(&self) -> Result<(), Box<dyn Error>> {
         if let Some(selection) = self.selection {
             if let Some((_, crates)) = self.get_cached_crates() {
@@ -404,7 +426,7 @@ impl App {
         Ok(())
     }
 
-    #[cfg(feature = "no-copy")]
+    #[cfg(not(feature = "copy"))]
     fn copy_selection(&self) -> Result<(), Box<dyn Error>> {
         Err("Feature Disabled".into())
     }
