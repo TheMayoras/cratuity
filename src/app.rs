@@ -332,6 +332,18 @@ impl App {
                         self.mode = AppMode::Normal;
                         self.do_search();
                     }
+                    InputEvent::Right
+                    | InputEvent::Down
+                    | InputEvent::Char('j')
+                    | InputEvent::Char('J') => {
+                        *selection = cmp::min(*selection + 1, 4);
+                    }
+                    InputEvent::Left
+                    | InputEvent::Up
+                    | InputEvent::Char('k')
+                    | InputEvent::Char('K') => {
+                        *selection = selection.saturating_sub(1);
+                    }
                     InputEvent::Char(c) => match c {
                         'p' | 'P' => {
                             *selection = selection.saturating_sub(1);
@@ -341,12 +353,6 @@ impl App {
                         }
                         _ => {}
                     },
-                    InputEvent::Right | InputEvent::Down => {
-                        *selection = cmp::min(*selection + 1, 4);
-                    }
-                    InputEvent::Left | InputEvent::Up => {
-                        *selection = selection.saturating_sub(1);
-                    }
                     _ => {}
                 },
             }
