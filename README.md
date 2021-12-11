@@ -13,17 +13,32 @@ results each
 
 ## Requirements and Optional Features
 
-## Clipboard
+## Features 
+
+### Default Features
+
+By default, cratuity is built with both clipboard access and "open in browser" features.
+
+To turn them off, build with `--no-default-features`.
+
+### Clipboard Access
+
+To allow cratuity to copy to your clipboard, the `copy` feature is required.  This is turned on by default.
+
+You can copy the Cargo.toml format for a crate's most recent version by
+selecting the crate with J/K and then pressing C to copy the string to the
+clipboard.  For example, selecting the `serde` crate and pressing C may cause
+something like the following to be copied to your clipboard: `serde = "1.0.118"`
+
+### Open in Browser
+
+If the `browser` feature is turned on, cratuity can open the documentation link for a crate in your system's default browser.
+
+## Requirements
+
+### Clipboard Access
 
 To have access to the clipboard on _Linux_ `xorg-dev` must be installed
-
-### To Turn Off Clipboard Access
-
-`cargo install` must be used with the `no-copy` feature
-
-```sh
-cargo install cratuity --features no-copy
-```
 
 ## Usage
 
@@ -36,12 +51,6 @@ page up.  Press q to quit from the search screen.
 When scrolling through the pages, you can change you search term at any time by
 pressing f, or you can change the sorting method by pressing S.
 
-## Copying
-
-You can copy the Cargo.toml format for a crate's most recent version by
-selecting the crate with J/K and then pressing C to copy the string to the
-clipboard.  For example, selecting the `serde` crate and pressing C may cause
-something like the following to be copied to your clipboard: `serde = "1.0.118"`
 
 ## Sorting
 
